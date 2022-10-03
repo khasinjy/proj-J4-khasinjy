@@ -1,0 +1,72 @@
+
+Voir https://github.com/khasinjy/proj-J4-khasinjy
+Externalisation de la configuration des microservices: 
+- creer spring projet (dependences: config server)
+- dans ConfigserverApplication @EnableConfigServer
+- dans projet configserver, configurer dans application.properties:
+spring.application.name=config-server
+server.port=9000
+spring.cloud.config.server.git.uri=lienGithub
+
+- creer un repository github avec microservice-name.properties à la racine qui contient (la config du serveur)
+- dans le ms, pom.xml, ajouter les dependences :
+	spring-boot-configuration-processor
+	spring-cloud-starter-config
+	spring-boot-starter-actuator
+- creer dans le ms, bootstrap.properties :
+spring.application.name=microservice-name
+spring.cloud.config.uri=http://localhost:9000
+management.endpoints.web.exposure.include=*
+
+localhost: 9999/contrat/actuator/refresh (post)
+___________________
+
+Annuaire : 
+Doit regrouper la liste des micro-services. Savoir quel ms est demarre et sur quel port.
+- creer spring projet (dependences: config client; eureka server)
+- pom.xml du eureka server,  pour que tous les sous-projets aient le meme:
+	- changer la version de spring-boot-starter-parent
+	- changer la version de spring-cloud.version
+- externaliser la config dans eureka, bootstrap.properties
+- dans l'application @EnableEurekaServer
+- creer dans le repository github le fichier eureka-server.properties
+- mettre en commentaire les ports dans microservice.properties
+- dans le pom des ms, ajouter dependence  : spring-cloud-starter-netflix-eureka-client
+- pour faire le lien entre eureka et les ms, dans ms.properties, ajouter eureka.client.serviceUrl.defaultZone:http://localhost:9001/eureka/
+- dans le main du ms @EnableDiscoveryClient
+- preciser le port, lancer le ms avec Run As ajouter dans VM arguments : -Dserver.port=9999
+- voir sur eureka le ms demarré
+
+___
+L'équilibrage de charge des serveurs informatiques dans une grappe est le processus de distribution des requêtes sur différents serveurs. Cette répartition des requêtes est indispensable pour obtenir un temps de réponse réduit ainsi qu'une optimisation de l'utilisation des ressources informatiques.
+
+L'equilibreur de charge (Load Balancer) fait appel aux ms. L'equilibreur va chercher l'instance qui repond le plus rapidement suite à un ping puis lui envoie la requete. -> perfomance et resilience
+Il s'agit de client-ui dans ce projet, 
+- ajouter dans le pom: spring-cloud-starter-netflix-eureka-client et spring-cloud-starter-netflix-ribbon
+- dans les proxies du client-ui, ajouter @RibbonClient(name = "microservice-contrat") et commenter le port pour que l'equilibreur choisisse l'instance.
+
+
+
+Toujours lancer dans l'ordre : 
+- config server
+- eureka
+- les microservices
+- zuul
+- ui
+
+___
+Gateway (=passerelle)
+Intercepter toutes les requetes / reponses, verifie si la requete respecte les regles, elle peut modifier la requete. -> Securite
+ - creer spring projet (dependences: config client; eureka client, netflix zuul, spring security)
+- @EnableZuulProxy
+- creer les filtres
+_____________
+La dependence spring-boot-devtools : permet de redemarré un ms quand son pom est modifié
+_____________
+Tracabilite
+- ajouter dependence spring-cloud-starter-sleuth PARTOUT
+- client-ui : ajouter dependence starter zipkin
+- pour chaque ms, dans un ss-package, creer une classe Sleuth Config public Sampler defaultSampler(){
+        return Sampler.ALWAYS_SAMPLE;
+    }
+- dans les proxies, @FeignClient(name = "zuul-server")
